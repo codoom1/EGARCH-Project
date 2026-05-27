@@ -1,0 +1,26 @@
+.Rhistory
+.RData
+.Ruserdata
+.Rproj.user/
+
+# renv local state
+renv/library/
+renv/local/
+renv/staging/
+
+# Project output
+data/*
+!data/.gitkeep
+results/**
+!results/.gitkeep
+!results/**/
+!results/**/*.csv
+!results/**/*.png
+!results/**/*.pdf
+results/**/chunks/
+results/**/*.rds
+logs/*
+!logs/.gitkeep
+
+# System files
+.DS_Store
