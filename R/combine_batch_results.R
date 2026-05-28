@@ -17,7 +17,7 @@ called_from_source <- function() {
 combine_batch_results <- function(config = simulation_config) {
   chunk_dir <- Sys.getenv(
     "EGARCH_CHUNK_DIR",
-    unset = file.path(config$output_dir, "chunks")
+    unset = file.path(config$output_dir, "batch/chunks")
   )
 
   chunk_files <- sort(list.files(
