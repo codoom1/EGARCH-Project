@@ -10,28 +10,71 @@ suppressPackageStartupMessages({
 })
 
 publication_palette <- c(
-  "Normal" = "#005AB5",
-  "Student-t" = "#B64000",
+  "NORM" = "#005AB5",
   "GED" = "#007A3D",
-  "Skewed Student-t" = "#8F2D74",
-  "Skewed GED" = "#9C6500"
+  "SGED" = "#9C6500",
+  "STD" = "#B64000",
+  "SSTD" = "#8F2D74"
 )
 
 publication_linetypes <- c(
-  "Normal" = "solid",
-  "Student-t" = "longdash",
+  "NORM" = "solid",
   "GED" = "dotdash",
-  "Skewed Student-t" = "twodash",
-  "Skewed GED" = "dotted"
+  "SGED" = "dotted",
+  "STD" = "longdash",
+  "SSTD" = "twodash"
 )
 
 publication_shapes <- c(
-  "Normal" = 16,
-  "Student-t" = 17,
+  "NORM" = 16,
   "GED" = 15,
-  "Skewed Student-t" = 18,
-  "Skewed GED" = 8
+  "SGED" = 8,
+  "STD" = 17,
+  "SSTD" = 18
 )
+
+distribution_short_labels <- c(
+  norm = "NORM",
+  ged = "GED",
+  sged = "SGED",
+  std = "STD",
+  sstd = "SSTD",
+  Normal = "NORM",
+  GED = "GED",
+  `Skewed GED` = "SGED",
+  `Student-t` = "STD",
+  `Skewed Student-t` = "SSTD"
+)
+
+distribution_short_levels <- c("NORM", "GED", "SGED", "STD", "SSTD")
+
+short_distribution_label <- function(x) {
+  dplyr::recode(as.character(x), !!!distribution_short_labels, .default = as.character(x))
+}
+
+add_plot_distribution_labels <- function(data) {
+  if ("true_dist" %in% names(data)) {
+    data$true_dist_label <- short_distribution_label(data$true_dist)
+  } else if ("true_dist_label" %in% names(data)) {
+    data$true_dist_label <- short_distribution_label(data$true_dist_label)
+  }
+
+  if ("assumed_dist" %in% names(data)) {
+    data$assumed_dist_label <- short_distribution_label(data$assumed_dist)
+  } else if ("assumed_dist_label" %in% names(data)) {
+    data$assumed_dist_label <- short_distribution_label(data$assumed_dist_label)
+  }
+
+  if ("true_dist_label" %in% names(data)) {
+    data$true_dist_label <- factor(data$true_dist_label, levels = distribution_short_levels)
+  }
+
+  if ("assumed_dist_label" %in% names(data)) {
+    data$assumed_dist_label <- factor(data$assumed_dist_label, levels = distribution_short_levels)
+  }
+
+  data
+}
 
 publication_theme <- function(base_size = 17) {
   theme_bw(base_size = base_size, base_family = "sans") +
@@ -75,6 +118,8 @@ facet_columns <- function(panel_count, default = 2L) {
 }
 
 make_selection_plot <- function(data, criterion_label) {
+  data <- add_plot_distribution_labels(data)
+
   ggplot(
     dplyr::filter(data, !is.na(selection_rate)),
     aes(
@@ -111,7 +156,7 @@ make_selection_plot <- function(data, criterion_label) {
 }
 
 make_selection_heatmap <- function(data, criterion_label) {
-  plot_data <- data %>%
+  plot_data <- add_plot_distribution_labels(data) %>%
     dplyr::mutate(
       label = ifelse(is.na(selection_rate), "", label_percent(accuracy = 1)(selection_rate)),
       label_color = ifelse(!is.na(selection_rate) & selection_rate >= 0.55, "white", "black")
@@ -176,7 +221,56 @@ line_layer_if_multiple_samples <- function(data, linewidth = 1) {
   geom_line(linewidth = linewidth)
 }
 
+make_volatility_recovery_plot <- function(
+  data,
+  subtitle = "Lower values indicate more accurate recovery of the simulated EGARCH volatility process."
+) {
+  ggplot(
+    data,
+    aes(
+      x = sample_size_label,
+      y = rmse,
+      color = assumed_dist_label,
+      linetype = assumed_dist_label,
+      group = assumed_dist_label
+    )
+  ) +
+    geom_line(
+      linewidth = 1.25,
+      alpha = 0.86,
+      position = position_dodge(width = 0.22)
+    ) +
+    geom_point(
+      shape = 16,
+      size = 3.2,
+      position = position_dodge(width = 0.22)
+    ) +
+    facet_grid(target ~ true_dist_short_label, scales = "free_y") +
+    scale_x_discrete(labels = format_sample_size) +
+    scale_color_manual(values = publication_palette, drop = FALSE) +
+    scale_linetype_manual(values = publication_linetypes, drop = FALSE) +
+    labs(
+      x = "Sample size",
+      y = "Mean RMSE",
+      color = "Assumed distribution",
+      linetype = "Assumed distribution",
+      title = "Volatility-path recovery",
+      subtitle = subtitle
+    ) +
+    guides(
+      color = guide_legend(nrow = 2, byrow = TRUE),
+      linetype = guide_legend(nrow = 2, byrow = TRUE)
+    ) +
+    publication_theme() +
+    theme(
+      axis.text.x = element_text(angle = 30, hjust = 1, vjust = 1),
+      strip.text.y = element_text(angle = 90)
+    )
+}
+
 make_parameter_heatmap <- function(data, parameter_label = NULL) {
+  data <- add_plot_distribution_labels(data)
+
   parameter_count <- dplyr::n_distinct(data$parameter)
   facet_layer <- if (parameter_count > 1L) {
     facet_grid(
@@ -281,13 +375,44 @@ make_parameter_heatmaps_by_parameter <- function(data) {
 }
 
 make_simulation_plots <- function(summaries, sim_results = NULL) {
+  summaries$fit_summary <- add_plot_distribution_labels(summaries$fit_summary)
+  summaries$aic_selection_frequency <- add_plot_distribution_labels(summaries$aic_selection_frequency)
+  summaries$bic_selection_frequency <- add_plot_distribution_labels(summaries$bic_selection_frequency)
+  summaries$parameter_summary <- add_plot_distribution_labels(summaries$parameter_summary)
+
   if (!is.null(sim_results) &&
       all(c("true_dist", "assumed_dist") %in% names(sim_results)) &&
       !all(c("true_dist_label", "assumed_dist_label") %in% names(sim_results))) {
     sim_results <- add_distribution_labels(sim_results)
   }
 
-  fit_summary_long <- summaries$fit_summary %>%
+  if (!is.null(sim_results)) {
+    sim_results <- add_plot_distribution_labels(sim_results)
+  }
+
+  volatility_rmse_max <- 100
+
+  fit_summary_long <- if (!is.null(sim_results) &&
+                          all(c("sigma_rmse", "variance_rmse") %in% names(sim_results))) {
+    sim_results %>%
+      dplyr::filter(
+        converged,
+        !is.na(sigma_rmse),
+        !is.na(variance_rmse),
+        sigma_rmse <= volatility_rmse_max,
+        variance_rmse <= volatility_rmse_max
+      ) %>%
+      dplyr::group_by(n, true_dist, true_dist_label, assumed_dist, assumed_dist_label) %>%
+      dplyr::summarise(
+        mean_sigma_rmse = mean(sigma_rmse, na.rm = TRUE),
+        mean_variance_rmse = mean(variance_rmse, na.rm = TRUE),
+        .groups = "drop"
+      )
+  } else {
+    summaries$fit_summary
+  }
+
+  fit_summary_long <- fit_summary_long %>%
     tidyr::pivot_longer(
       cols = c(mean_sigma_rmse, mean_variance_rmse),
       names_to = "target",
@@ -296,8 +421,13 @@ make_simulation_plots <- function(summaries, sim_results = NULL) {
     dplyr::mutate(
       target = dplyr::recode(
         target,
-        mean_sigma_rmse = "Conditional standard deviation",
-        mean_variance_rmse = "Conditional variance"
+        mean_sigma_rmse = "Sigma path",
+        mean_variance_rmse = "Variance path"
+      ),
+      sample_size_label = factor(n, levels = sort(unique(n))),
+      true_dist_short_label = factor(
+        short_distribution_label(true_dist),
+        levels = distribution_short_levels
       )
     )
 
@@ -335,39 +465,14 @@ make_simulation_plots <- function(summaries, sim_results = NULL) {
       summaries$bic_selection_frequency,
       "BIC"
     ),
-    volatility_rmse = ggplot(
+    volatility_rmse = make_volatility_recovery_plot(
       fit_summary_long,
-      aes(
-        x = n,
-        y = rmse,
-        color = assumed_dist_label,
-        linetype = assumed_dist_label,
-        shape = assumed_dist_label,
-        group = assumed_dist_label
-      )
-    ) +
-      line_layer_if_multiple_samples(fit_summary_long, linewidth = 1.7) +
-      geom_point(size = 4.4, stroke = 0.7) +
-      facet_grid(target ~ true_dist_label, scales = "free_y") +
-      scale_x_continuous(labels = format_sample_size) +
-      scale_color_manual(values = publication_palette, drop = FALSE) +
-      scale_linetype_manual(values = publication_linetypes, drop = FALSE) +
-      scale_shape_manual(values = publication_shapes, drop = FALSE) +
-      labs(
-        x = "Sample size",
-        y = "Mean RMSE",
-        color = "Assumed distribution",
-        linetype = "Assumed distribution",
-        shape = "Assumed distribution",
-        title = "Volatility-path recovery",
-        subtitle = "Lower values indicate more accurate recovery of the simulated EGARCH volatility process."
-      ) +
-      guides(
-        color = guide_legend(nrow = 2, byrow = TRUE),
-        linetype = guide_legend(nrow = 2, byrow = TRUE),
-        shape = guide_legend(nrow = 2, byrow = TRUE)
-      ) +
-      publication_theme(),
+      subtitle = "Lower values indicate more accurate recovery of the simulated EGARCH volatility process."
+    ),
+    volatility_rmse_large_n = make_volatility_recovery_plot(
+      dplyr::filter(fit_summary_long, n > 100),
+      subtitle = "The n = 100 panels are omitted to focus on large-sample recovery differences."
+      ),
     information_criteria = ggplot(
       information_criteria,
       aes(
@@ -477,10 +582,15 @@ make_simulation_plots <- function(summaries, sim_results = NULL) {
   )
 
   if (!is.null(sim_results)) {
+    rmse_distribution_max <- 100
+    small_sample_rmse_max <- 1
+
     plots$rmse_distribution <- sim_results %>%
       dplyr::filter(
         converged,
         !is.na(RMSE),
+        RMSE <= rmse_distribution_max,
+        !(n == 100 & RMSE > small_sample_rmse_max),
         !is.na(true_dist_label),
         !is.na(assumed_dist_label)
       ) %>%
@@ -512,7 +622,11 @@ make_simulation_plots <- function(summaries, sim_results = NULL) {
         y = "Volatility RMSE",
         fill = "Assumed distribution",
         title = "Distribution of volatility recovery errors",
-        subtitle = "Boxplots expose Monte Carlo dispersion and outliers that mean RMSE curves can hide."
+        subtitle = paste0(
+          "For n = 100, RMSE > ",
+          small_sample_rmse_max,
+          " is excluded from this plot only to keep small-sample comparisons readable."
+        )
       ) +
       publication_theme(base_size = 15) +
       theme(
@@ -530,6 +644,7 @@ plot_dimensions <- list(
   aic_selection_heatmap = c(width = 13, height = 9.5),
   bic_selection_heatmap = c(width = 13, height = 9.5),
   volatility_rmse = c(width = 14.5, height = 9.5),
+  volatility_rmse_large_n = c(width = 14.5, height = 9.5),
   information_criteria = c(width = 14.5, height = 9.5),
   convergence_rate = c(width = 14, height = 9),
   parameter_rmse = c(width = 15.5, height = 13),

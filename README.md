@@ -19,6 +19,7 @@ The detailed simulation methodology is documented in [docs/simulation-procedure.
 ├── data/                        # Optional local inputs, if added later
 ├── docs/                        # Project documentation and methodology notes
 ├── scripts/                     # SLURM and batch helper scripts
+│   └── make-paper-latex-tables.R # Convert paper-style CSV tables to LaTeX
 ├── results/                     # Generated tables, plots, and saved outputs
 ├── README.md
 └── renv.lock                    # Reproducible R package environment
@@ -89,7 +90,15 @@ Simulation outputs are written to `results/` by default:
 - `bic_selection_frequency.csv`
 - `parameter_summary.csv`
 - `simulation_outputs.rds`
-- plot PNG files
+- plot PNG and PDF files, including `aic_selection`, `bic_selection`, `convergence_rate`, `information_criteria`, `parameter_rmse`, `parameter_rmse_heatmap*`, `rmse_distribution`, `volatility_rmse`, and `volatility_rmse_large_n`
+
+Paper-style summary tables are written to `results/paper_tables/`, with LaTeX exports and a combined preview bundle in `results/paper_tables/latex/`.
+
+To regenerate the LaTeX tables from the CSV inputs, run:
+
+```r
+source("scripts/make-paper-latex-tables.R")
+```
 
 ## Notes
 
